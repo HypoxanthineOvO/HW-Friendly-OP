@@ -23,6 +23,10 @@ def QKV_Attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor) -> torch.Te
     output = torch.matmul(attention_weights, V)
     return attention_weights, output
 
+def Approx_QKV_Attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, max_iter: int = 10) -> torch.Tensor:
+    attention_weights = Approx_Scale_Product(Q, K, max_iter=max_iter)
+    output = torch.matmul(attention_weights, V)
+    return attention_weights, output
 
 
 class MultiHeadAttention(torch.nn.Module):
@@ -30,6 +34,7 @@ class MultiHeadAttention(torch.nn.Module):
         embed_dim: int, # Dimension of the input embeddings
         num_heads: int, # Number of attention heads
         bias: bool = False, # Whether to use bias in linear layers
+        approx: bool = False
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -42,6 +47,11 @@ class MultiHeadAttention(torch.nn.Module):
         self.key_proj = torch.nn.Linear(embed_dim, embed_dim, bias=bias)
         self.value_proj = torch.nn.Linear(embed_dim, embed_dim, bias=bias)
         self.out_proj = torch.nn.Linear(embed_dim, embed_dim, bias=bias)
+    
+        if (approx):
+            self.QKV_Attention = Approx_QKV_Attention
+        else:
+            self.QKV_Attention = QKV_Attention
     
     def get_standard_statc_dict(self):
         standard_state_dict = {}
@@ -85,7 +95,7 @@ class MultiHeadAttention(torch.nn.Module):
         v = v.view(batch_size, seq_len, self.num_heads, self.d_k).transpose(1, 2)
         # Compute attention
         print(f"Q shape: {q.shape}, K shape: {k.shape}, V shape: {v.shape}")
-        attn_weight, attn_output = QKV_Attention(q, k, v)
+        attn_weight, attn_output = self.QKV_Attention(q, k, v)
         # Output projection
         attn_output = attn_output.transpose(1, 2).contiguous().view(batch_size, seq_len, self.embed_dim)
         output = self.out_proj(attn_output)

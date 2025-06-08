@@ -8,9 +8,9 @@ import Modules.Attention.Attention as Attention
 
 if __name__ == "__main__":
     # Test case 1: Scaled Dot-Product
-    Q = torch.rand(2, 256, 256)
-    K = torch.rand(2, 256, 256)
-    V = torch.rand(2, 256, 256)
+    Q = torch.rand(2, 16, 16)
+    K = torch.rand(2, 16, 16)
+    V = torch.rand(2, 16, 16)
     weights, output = Attention.QKV_Attention(Q, K, V)
     
     reference = torch.nn.functional.scaled_dot_product_attention(
@@ -24,7 +24,18 @@ if __name__ == "__main__":
         loss = torch.nn.functional.mse_loss(output, reference)
         print(f"Error! Loss = {loss}")
     
-    # Test case 2: Multi-Head Attention
+    # Test case 2: Approximate Scaled Dot-Product
+    weights, output = Attention.Approx_QKV_Attention(Q, K, V, 16)
+    if (torch.allclose(output, reference, rtol=1e-2)):
+        print("=" * 10, " Approx Check Pass " , "=" * 10)
+    else:
+        print("Approx Output:\n", output[..., :4, :4])
+        print("Reference Output:\n", reference[..., :4, :4])
+        loss = torch.nn.functional.mse_loss(output, reference)
+        print(f"Approx Error! Loss = {loss}")
+        exit()
+    
+    # Test case 3: Multi-Head Attention
     num_heads = 8
     embed_dim = 256
     mha_mine = Attention.MultiHeadAttention(embed_dim, num_heads, bias = True)
@@ -47,3 +58,4 @@ if __name__ == "__main__":
         print("Reference Output:\n", mha_ref_output.transpose(0, 1))
         loss = torch.nn.functional.mse_loss(output, mha_ref_output.transpose(0, 1))
         print(f"Error! Loss = {loss}")
+    
