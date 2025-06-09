@@ -1,7 +1,7 @@
 import torch
 import os, sys
 
-sys.path.append(".")
+sys.path.append("..")
 
 import Modules.Attention.Attention as Attention
 
