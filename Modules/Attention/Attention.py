@@ -1,5 +1,5 @@
 import torch
-from Modules.Attention.ApproxMatmul import Approx_Scale_Product
+from Modules.Attention.ApproxScaleProduct import Approx_Scale_Product
 
 def Scaled_Product(Q: torch.Tensor, K: torch.Tensor) -> torch.Tensor:
     # Compute QK^T
