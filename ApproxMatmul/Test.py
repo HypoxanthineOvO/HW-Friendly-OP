@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-import HYX
+import VSP
 
 
 if __name__ == "__main__":
@@ -15,7 +15,7 @@ if __name__ == "__main__":
         in_features = IN_FEATURES, out_features = OUT_FEATURES,
         bias = BIAS
     )
-    linear_mine = HYX.Linear(
+    linear_mine = VSP.Linear(
         in_features = IN_FEATURES, out_features = OUT_FEATURES,
         bias = BIAS,
         max_iter = 0.8
@@ -23,13 +23,13 @@ if __name__ == "__main__":
     linear_mine.load_torch_state_dict(linear_torch.state_dict())
     
     x = torch.randn(N, IN_FEATURES)
-    HYX.printNamedTensor("Input Tensor:", x)
-    HYX.printNamedTensor("Weight: ", linear_mine.weight)
-    HYX.printNamedTensor("Bias: ", linear_mine.bias)
+    VSP.printNamedTensor("Input Tensor:", x)
+    VSP.printNamedTensor("Weight: ", linear_mine.weight)
+    VSP.printNamedTensor("Bias: ", linear_mine.bias)
     output_torch = linear_torch(x)
     output_mine = linear_mine(x)
-    HYX.printNamedTensor("Linear Output Torch:", output_torch.flatten()[:10])
-    HYX.printNamedTensor("Linear Output Mine:", output_mine.flatten()[:10])
+    VSP.printNamedTensor("Linear Output Torch:", output_torch.flatten()[:10])
+    VSP.printNamedTensor("Linear Output Mine:", output_mine.flatten()[:10])
     err = torch.nn.functional.mse_loss(output_torch, output_mine)
     print(f"Error: {err.item():.4f}")
-    HYX.check( torch.allclose(output_torch, output_mine), "Same Output")
+    VSP.check( torch.allclose(output_torch, output_mine), "Same Output")
