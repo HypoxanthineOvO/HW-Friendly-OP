@@ -1,12 +1,18 @@
 import torch
 
-def Approx_Matmul(A: torch.Tensor, B: torch.Tensor, max_iter: int = 10) -> torch.Tensor:
-    assert A.dim() == 2 and B.dim() == 2, "Q and K must be 2D tensors"
-    assert A.size(1) == B.size(1), "Q and K must have the same feature dimension"
+def Approx_Matmul(
+    A: torch.Tensor, B: torch.Tensor, max_iter: int = 10,
+    debug: bool = False
+    ) -> torch.Tensor:
+    assert A.dim() == 2 and B.dim() == 2, "A and B must be 2D tensors"
+    assert A.size(1) == B.size(1), f"A({A.shape}) and B({B.shape}) must have the same feature dimension"
     A_vec_size = A.size(0)
     dtype, device = A.dtype, A.device
     
     total_score = []
+    
+    if debug:
+        print("*" * 50)
     
     for a_id in range(A_vec_size):
         a_mat = A[a_id].repeat(B.size(0), 1)
@@ -30,7 +36,7 @@ def Approx_Matmul(A: torch.Tensor, B: torch.Tensor, max_iter: int = 10) -> torch
             product_for_min[min_idx_row, min_idx_col] = float('inf')  # Set the min value to inf to avoid selecting it again
 
         # Set the <0 values to 0
-        greedy_score[greedy_score < 0] = 0
         total_score.append(greedy_score)
     total_score = torch.stack(total_score)
+    
     return total_score
