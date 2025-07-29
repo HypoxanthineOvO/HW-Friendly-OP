@@ -3,7 +3,10 @@ import math
 from .ApproximateMatmul import Approx_Matmul
 
 class Linear(torch.nn.Module):
-    def __init__(self, in_features: int, out_features: int, bias: bool = True, max_iter: int|float = -1):
+    def __init__(self, 
+                 in_features: int, out_features: int, bias: bool = True, 
+                 device: str = "cpu",
+                 max_iter: int|float = -1):
         super(Linear, self).__init__()
         self.weight = torch.nn.Parameter(torch.Tensor(out_features, in_features))
         if bias:
