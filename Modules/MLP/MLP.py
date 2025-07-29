@@ -1,8 +1,6 @@
 import torch
 
 import os, sys
-# 找到 HW-Friendly-OP 的根目录
-# 从当前文件目录开始，向上查找 HW-Friendly-OP 目录
 current_dir = os.path.abspath(os.path.dirname(__file__))
 while True:
     if os.path.basename(current_dir) == "HW-Friendly-OP":
@@ -13,7 +11,6 @@ while True:
         raise RuntimeError("HW-Friendly-OP directory not found.")
     current_dir = parent_dir
 print(f"Base directory found: {base_dir}")
-# 添加 ApproxMatmul 的路径
 sys.path.append(os.path.join(base_dir, "ApproxMatmul"))
 from ApproxMatmul.VSP import Approx_Matmul
 
