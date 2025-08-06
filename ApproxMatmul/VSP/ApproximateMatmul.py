@@ -92,14 +92,15 @@ def Approx_Matmul_Row(
         a_mat = A[a_id].repeat(B.size(0), 1)
         product = B * a_mat
         
-        print(max_iter)
-        printNamedTensor("Product ",product)
         row_sorted_matrix = torch.sort(product, dim=1, descending=True)[0]
-        printNamedTensor("Row Sorted Matrix:", row_sorted_matrix)
         row_scores_max = row_sorted_matrix[:, :max_iter].sum(dim = 1)
         row_scores_min = row_sorted_matrix[:, -max_iter: ].sum(dim = 1)
-        printNamedTensor("Row Scores Max:", row_scores_max)
-        printNamedTensor("Row Scores Min:", row_scores_min)
+        if debug:
+            print(f"Max Iter: {max_iter}")
+            printNamedTensor("Product ",product)
+            printNamedTensor("Row Sorted Matrix:", row_sorted_matrix)
+            printNamedTensor("Row Scores Max:", row_scores_max)
+            printNamedTensor("Row Scores Min:", row_scores_min)
         row_scores = row_scores_max + row_scores_min
         total_score.append(row_scores)
 
