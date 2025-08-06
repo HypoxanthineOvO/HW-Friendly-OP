@@ -33,8 +33,8 @@ def computeLoss(
 
 if __name__ == "__main__":
     Ns = [128]
-    IN_FEATURES = [16, 32]
-    OUT_FEATURES = [16, 32]
+    IN_FEATURES = [32]
+    OUT_FEATURES = [16, 32, 64]
     Approx_rate = [0.2, 0.5, 0.8, 0.9, 0.95]
     Methods = ["A3", "Row"]
     
@@ -90,12 +90,12 @@ if __name__ == "__main__":
     # Visualization: plot all methods and N in one figure with subplots
     num_methods = len(Methods)
     num_Ns = len(Ns)
-    fig, axes = plt.subplots(num_methods, num_Ns, figsize=(6 * num_Ns, 5 * num_methods), squeeze=False)
+    fig, axes = plt.subplots(num_Ns, num_methods, figsize=(6 * num_methods, 5 * num_Ns), squeeze=False)
 
-    y_min, y_max = 1e-16, 1e-2  # Set consistent y-axis limits
+    y_min, y_max = 1e-8, 1e-2  # Set consistent y-axis limits
 
-    for i, method in enumerate(Methods):
-        for j, N in enumerate(Ns):
+    for i, N in enumerate(Ns):
+        for j, method in enumerate(Methods):
             ax = axes[i][j]
             for in_f in IN_FEATURES:
                 for out_f in OUT_FEATURES:
