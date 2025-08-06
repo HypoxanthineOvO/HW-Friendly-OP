@@ -7,33 +7,79 @@ import VSP
 if __name__ == "__main__":
     torch.manual_seed(42)
     ########## 1. Linear ##########
+    ## 1.1. Input Shape [N, IN_FEATURES]
     N = 1
-    IN_FEATURES = 3
+    IN_FEATURES = 6
     OUT_FEATURES = 4
     BIAS = True
+    
+
     linear_torch = nn.Linear(
         in_features = IN_FEATURES, out_features = OUT_FEATURES,
         bias = BIAS
     )
-    linear_mine = VSP.Linear(
+    linear_A3 = VSP.Linear(
         in_features = IN_FEATURES, out_features = OUT_FEATURES,
         bias = BIAS,
-        max_iter = 1.0,
+        Approx_Config = {
+            "Method": "A3",
+            "Max_Iter": 1.0,  # 1.0 means 50% of total multiplications
+            "Debug": False
+        }
     )
-    linear_mine.load_torch_state_dict(linear_torch.state_dict())
     
+    linear_Row = VSP.Linear(
+        in_features = IN_FEATURES, out_features = OUT_FEATURES,
+        bias = BIAS,
+        Approx_Config = {
+            "Method": "Row",
+            "Max_Iter": 1.0,  # 1.0 means 50% of total multiplications
+            "Debug": True
+        }
+    )
+    
+    print(f"Input Shape: [{N}, {IN_FEATURES}]")
     x = torch.randn(N, IN_FEATURES)
     VSP.printNamedTensor("Input Tensor:", x)
-    VSP.printNamedTensor("Weight: ", linear_mine.weight)
-    VSP.printNamedTensor("Bias: ", linear_mine.bias)
+    VSP.printNamedTensor("Weight: ", linear_A3.weight)
+    VSP.printNamedTensor("Bias: ", linear_A3.bias)
     output_torch = linear_torch(x)
-    output_mine = linear_mine(x)
+    
+    linear_A3.load_torch_state_dict(linear_torch.state_dict())
+    output_A3 = linear_A3(x)
+    VSP.printNamedTensor("Linear Output Torch:", output_torch.flatten()[:10])
+    VSP.printNamedTensor("Linear Output Mine:", output_A3.flatten()[:10])
+    err = torch.nn.functional.mse_loss(output_torch, output_A3)
+    print(f"Error: {err.item():.4f}")
+    VSP.check( torch.allclose(output_torch, output_A3), "Output Check")
+    
+    
+    linear_Row.load_torch_state_dict(linear_torch.state_dict())
+    output_Row = linear_Row(x)
+    VSP.printNamedTensor("Linear Output Torch:", output_torch.flatten()[:10])
+    VSP.printNamedTensor("Linear Output Mine:", output_Row.flatten()[:10])
+    err = torch.nn.functional.mse_loss(output_torch, output_Row)
+    print(f"Error: {err.item():.4f}")
+    VSP.check(torch.allclose(output_torch, output_Row), "Output Check")
+    exit()
+    
+    
+    ## 1.2. More Input Shape
+    N = (1,3,4)
+    x = torch.randn(N + (IN_FEATURES,))
+    print(f"Input Shape: {N + (IN_FEATURES,)}")
+    VSP.printNamedTensor("Input Tensor:", x)
+    VSP.printNamedTensor("Weight: ", linear_A3.weight)
+    VSP.printNamedTensor("Bias: ", linear_A3.bias)
+    output_torch = linear_torch(x)
+    output_mine = linear_A3(x)
+    print(f"Output Shape: {output_torch.shape}, {output_mine.shape}")
     VSP.printNamedTensor("Linear Output Torch:", output_torch.flatten()[:10])
     VSP.printNamedTensor("Linear Output Mine:", output_mine.flatten()[:10])
     err = torch.nn.functional.mse_loss(output_torch, output_mine)
     print(f"Error: {err.item():.4f}")
     VSP.check( torch.allclose(output_torch, output_mine), "Same Output")
-    
+    exit()
     ########## 2. Attention ##########
     BATCH_SIZE = 2
     SEQ_LEN = 4

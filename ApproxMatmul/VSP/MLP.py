@@ -6,7 +6,12 @@ class Linear(torch.nn.Module):
     def __init__(self, 
                  in_features: int, out_features: int, bias: bool = True, 
                  device: str = "cpu",
-                 max_iter: int|float = -1):
+                 Approx_Config: dict = {
+                     "Method": "A3",
+                     "Max_Iter": 1.0,
+                     "Debug": False
+                 },
+                 ):
         super(Linear, self).__init__()
         self.weight = torch.nn.Parameter(torch.Tensor(out_features, in_features))
         if bias:
@@ -15,19 +20,36 @@ class Linear(torch.nn.Module):
             self.register_parameter('bias', None)
         self.reset_parameters()
         
-        if (isinstance(max_iter, int)):
-            if (max_iter > 0):
-                self.max_iter = max_iter
-            else:
-                self.max_iter = in_features * out_features // 2
-        elif (isinstance(max_iter, float)):
-            if (max_iter <= 0 or max_iter > 1):
-                raise ValueError("max_iter must be an integer or a float between 0 and 1")
-            else:
-                self.max_iter = int(in_features * out_features // 2 * max_iter)
+        self.to(device)
+        
+        # Parse Approx_Config
+        method = Approx_Config.get("Method", "A3")
+        if (method == "A3" or method == "Row"):
+            max_iter = Approx_Config.get("Max_Iter", 1.0)
+            debug = Approx_Config.get("Debug", False)
+            Final_Approx_Config = {
+                "Method": method,
+                "Max_Iter": max_iter,
+                "Debug": debug
+            }
+            # Check Validity
+            if not (isinstance(max_iter, int) or isinstance(max_iter, float)):
+                raise TypeError("max_iter must be an integer or a float")
+            if isinstance(max_iter, int):
+                if max_iter < 0:
+                    raise ValueError("max_iter must be non-negative")
+            if isinstance(max_iter, float):
+                if max_iter <= 0 or max_iter > 1:
+                    raise ValueError("max_iter as float must be in (0, 1]")
+                
+                if (method == "A3"):
+                    int_iter = int(in_features * out_features // 2 * max_iter)
+                elif (method == "Row"):
+                    int_iter = int(in_features / 2 * max_iter)
+                Final_Approx_Config["Max_Iter"] = int_iter
+            self.Approx_Config = Final_Approx_Config
         else:
-            raise TypeError("max_iter must be an integer or a float")
-        print("Max Iterations:", self.max_iter)
+            raise ValueError(f"Unknown Approximation Method: {method}")
         
 
     def reset_parameters(self):
@@ -45,7 +67,17 @@ class Linear(torch.nn.Module):
             self.bias.data = state_dict['bias']
 
     def forward(self, x: torch.Tensor):
-        mid = Approx_Matmul(x, self.weight, max_iter=self.max_iter)
+        x_shape = x.shape
+        output_shape = x_shape[:-1] + (self.weight.shape[0],)
+        x = x.view(-1, x_shape[-1])  # Flatten the input tensor
+        #print(x_shape, output_shape)
+        #exit()
+        
+        mid = Approx_Matmul(
+            x, self.weight, Approx_Config=self.Approx_Config
+            )
         if self.bias is not None:
             mid += self.bias
-        return mid
+        
+        result = mid.view(*output_shape)
+        return result

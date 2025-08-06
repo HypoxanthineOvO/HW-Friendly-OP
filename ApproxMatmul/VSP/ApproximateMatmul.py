@@ -2,6 +2,26 @@ import torch
 from .utils import printTensor, printNamedTensor
 
 def Approx_Matmul(
+    A: torch.Tensor, B: torch.Tensor,
+    Approx_Config: dict = {
+        "Method": "A3",
+        "Max_Iter": 10,
+        "Debug": False
+    },
+):
+    method = Approx_Config.get("Method", "A3")
+    debug = Approx_Config.get("Debug", False)
+    
+    if (method == "A3"):
+        max_iter = Approx_Config.get("Max_Iter", 10)
+        return Approx_Matmul_A3(A, B, max_iter=max_iter, debug=debug)
+    elif (method == "Row"):
+        max_iter = Approx_Config.get("Max_Iter", 1.0)
+        return Approx_Matmul_Row(A, B, max_iter = max_iter, debug = debug)
+    else:
+        raise ValueError(f"Unknown Approximation Method: {method}")
+
+def Approx_Matmul_A3(
     A: torch.Tensor, B: torch.Tensor, max_iter: int = 10,
     debug: bool = False
     ) -> torch.Tensor:
@@ -44,6 +64,45 @@ def Approx_Matmul(
 
         # Set the <0 values to 0
         total_score.append(greedy_score)
+    total_score = torch.stack(total_score)
+    
+    if debug:
+        printNamedTensor("Total Score:", total_score)
+        print("*" * 50)
+    return total_score
+
+
+def Approx_Matmul_Row(
+    A: torch.Tensor, B: torch.Tensor,
+    max_iter: int = 10, debug: bool = False
+) -> torch.Tensor:
+    assert A.dim() == 2 and B.dim() == 2, "A and B must be 2D tensors"
+    assert A.size(1) == B.size(1), f"A({A.shape}) and B({B.shape}) must have the same feature dimension"
+    A_vec_size = A.size(0)
+    dtype, device = A.dtype, A.device
+    
+    total_score = []
+    
+    if debug:
+        print("*" * 50)
+    
+    for a_id in range(A_vec_size):
+        if debug:
+            printNamedTensor(f"A[{a_id}]", A[a_id])
+        a_mat = A[a_id].repeat(B.size(0), 1)
+        product = B * a_mat
+        
+        print(max_iter)
+        printNamedTensor("Product ",product)
+        row_sorted_matrix = torch.sort(product, dim=1, descending=True)[0]
+        printNamedTensor("Row Sorted Matrix:", row_sorted_matrix)
+        row_scores_max = row_sorted_matrix[:, :max_iter].sum(dim = 1)
+        row_scores_min = row_sorted_matrix[:, -max_iter: ].sum(dim = 1)
+        printNamedTensor("Row Scores Max:", row_scores_max)
+        printNamedTensor("Row Scores Min:", row_scores_min)
+        row_scores = row_scores_max + row_scores_min
+        total_score.append(row_scores)
+
     total_score = torch.stack(total_score)
     
     if debug:
