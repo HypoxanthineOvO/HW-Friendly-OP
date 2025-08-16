@@ -1,5 +1,6 @@
 import torch
-from .utils import printTensor, printNamedTensor
+from .utils import printTensor, printNamedTensor, getMemoryAllocated
+from tqdm import trange, tqdm
 
 def Approx_Matmul(
     A: torch.Tensor, B: torch.Tensor,
@@ -21,7 +22,7 @@ def Approx_Matmul(
     else:
         raise ValueError(f"Unknown Approximation Method: {method}")
 
-def Approx_Matmul_A3(
+def Approx_Matmul_A3_naive(
     A: torch.Tensor, B: torch.Tensor, max_iter: int = 10,
     debug: bool = False
     ) -> torch.Tensor:
@@ -65,6 +66,54 @@ def Approx_Matmul_A3(
         # Set the <0 values to 0
         total_score.append(greedy_score)
     total_score = torch.stack(total_score)
+    
+    if debug:
+        printNamedTensor("Total Score:", total_score)
+        print("*" * 50)
+    return total_score
+
+def Approx_Matmul_A3(
+    A: torch.Tensor, B: torch.Tensor, max_iter: int = 10,
+    debug: bool = False
+    ) -> torch.Tensor:
+    assert A.dim() == 2 and B.dim() == 2, "A and B must be 2D tensors"
+    assert A.size(1) == B.size(1), f"A({A.shape}) and B({B.shape}) must have the same feature dimension"
+    A_vec_size = A.size(0)
+    output_size = B.size(0)
+    dtype, device = A.dtype, A.device
+    
+    total_score = torch.zeros((A_vec_size, B.size(0)), dtype=dtype, device = device, requires_grad = False)
+    
+    if debug:
+        print("*" * 50)
+    
+    iterator = trange(A_vec_size) if debug else range(A_vec_size)
+    for a_id in iterator:
+        if debug:
+            printNamedTensor(f"A[{a_id}]", A[a_id])
+        
+        a_mat = A[a_id].repeat(B.size(0), 1).to(device)
+        product = (B * a_mat).detach() # Critical!!! If not detach, memory will keep increasing because of autograd
+        
+        product_flatten = product.flatten() # No Memory Increase
+        max_k_values, max_k_indices = torch.topk(product_flatten, k=max_iter)
+        min_k_values, min_k_indices = torch.topk(product_flatten, k=max_iter, largest=False)
+        
+        # Accumulate the scores with column val
+        total_score[a_id].index_add_(
+            0, 
+            max_k_indices // product.size(1), 
+            max_k_values
+        )
+        total_score[a_id].index_add_(
+            0, 
+            min_k_indices // product.size(1), 
+            min_k_values
+        )
+
+        del a_mat, product, product_flatten, max_k_values, max_k_indices, min_k_values, min_k_indices
+        torch.cuda.empty_cache()
+
     
     if debug:
         printNamedTensor("Total Score:", total_score)

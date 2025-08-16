@@ -50,7 +50,9 @@ class Linear(torch.nn.Module):
             self.Approx_Config = Final_Approx_Config
         else:
             raise ValueError(f"Unknown Approximation Method: {method}")
+        self.debug = self.Approx_Config["Debug"]
         
+        self.chunk_size = 512*512
 
     def reset_parameters(self):
         torch.nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
@@ -60,9 +62,13 @@ class Linear(torch.nn.Module):
             torch.nn.init.uniform_(self.bias, -bound, bound)
 
     def load_torch_state_dict(self, state_dict):
-        print(self.weight.shape)
+        if self.debug:
+            print("Loading state dict...")
+            print("Weight shape:", state_dict['weight'].shape)
+            if self.bias is not None:
+                print("Bias shape:", state_dict['bias'].shape)
         self.weight.data = state_dict['weight']
-        print("Weight loaded:", self.weight.shape)
+        
         if self.bias is not None:
             self.bias.data = state_dict['bias']
 
@@ -70,12 +76,28 @@ class Linear(torch.nn.Module):
         x_shape = x.shape
         output_shape = x_shape[:-1] + (self.weight.shape[0],)
         x = x.view(-1, x_shape[-1])  # Flatten the input tensor
-        #print(x_shape, output_shape)
-        #exit()
-        
-        mid = Approx_Matmul(
-            x, self.weight, Approx_Config=self.Approx_Config
-            )
+
+        x.to("cpu")
+        # Chunk the input tensor if it is too large
+        if (x.numel() > self.chunk_size):
+            x_chunks = x.split(self.chunk_size, dim=0)
+            output_chunks = []
+            for chunk in x_chunks:
+                print(f"MEMORY Before Approx Matmul: {torch.cuda.memory_allocated() / (1024 ** 2) if torch.cuda.is_available() else 0:.2f} MB")
+                chunk = chunk.to(self.weight.device)
+                output = Approx_Matmul(
+                    chunk, self.weight, Approx_Config=self.Approx_Config
+                ).cpu()
+                print(f"MEMORY After Aprox Matmul: {torch.cuda.memory_allocated() / (1024 ** 2) if torch.cuda.is_available() else 0:.2f} MB")
+                output_chunks.append(output)
+                
+            mid = torch.cat(output_chunks, dim=0).to(x.device)
+        else:
+            x = x.to(self.weight.device)
+
+            mid = Approx_Matmul(
+                x, self.weight, Approx_Config=self.Approx_Config
+                )
         if self.bias is not None:
             mid += self.bias
         
