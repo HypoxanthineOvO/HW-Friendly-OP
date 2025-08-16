@@ -1,6 +1,7 @@
 import os
 import torch
-
+import inspect
+import linecache
 
 class AnsiColor:
     # ANSI 码表
@@ -79,3 +80,35 @@ def check(check_result: bool, message: str):
     else:
         print(color(f"Check Passed: {message}", "green", "bold"))
 
+def getMemoryAllocated(mem_unit: str = "MB") -> float:
+    if not torch.cuda.is_available():
+        return 0.0
+    mem_bytes = torch.cuda.memory_allocated()
+    if mem_unit == "B":
+        return float(mem_bytes)
+    elif mem_unit == "KB":
+        return float(mem_bytes) / 1024
+    elif mem_unit == "MB":
+        return float(mem_bytes) / (1024 ** 2)
+    elif mem_unit == "GB":
+        return float(mem_bytes) / (1024 ** 3)
+    else:
+        raise ValueError(f"Unknown memory unit: {mem_unit}")
+
+
+def get_previous_line():
+    # 获取当前调用栈
+    stack = inspect.stack()
+    # 索引1表示调用者的栈帧（0是当前函数自身）
+    caller_frame = stack[1]
+    # 获取调用位置的文件名和行号
+    filename = caller_frame.filename
+    lineno = caller_frame.lineno
+    
+    # 目标行号：调用位置的上一行
+    target_lineno = lineno - 1
+    if target_lineno < 1:
+        raise ValueError("No previous line exists.")
+    
+    # 读取目标行内容
+    return linecache.getline(filename, target_lineno).rstrip('\n')
