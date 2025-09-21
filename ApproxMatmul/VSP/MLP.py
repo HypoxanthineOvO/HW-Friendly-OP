@@ -44,8 +44,10 @@ class Linear(torch.nn.Module):
                 
                 if (method == "A3"):
                     int_iter = int(in_features * out_features // 2 * max_iter)
+                    print(f"Approximate Iterations: {int_iter} for A3 Method (Feature Size: {in_features}, Output Size: {out_features})")
                 elif (method == "Row"):
                     int_iter = int(in_features / 2 * max_iter)
+                    print(f"Approximate Iterations: {int_iter} for Row Method (Feature Size: {in_features})")
                 Final_Approx_Config["Max_Iter"] = int_iter
             self.Approx_Config = Final_Approx_Config
         else:
@@ -83,12 +85,10 @@ class Linear(torch.nn.Module):
             x_chunks = x.split(self.chunk_size, dim=0)
             output_chunks = []
             for chunk in x_chunks:
-                print(f"MEMORY Before Approx Matmul: {torch.cuda.memory_allocated() / (1024 ** 2) if torch.cuda.is_available() else 0:.2f} MB")
                 chunk = chunk.to(self.weight.device)
                 output = Approx_Matmul(
                     chunk, self.weight, Approx_Config=self.Approx_Config
                 ).cpu()
-                print(f"MEMORY After Aprox Matmul: {torch.cuda.memory_allocated() / (1024 ** 2) if torch.cuda.is_available() else 0:.2f} MB")
                 output_chunks.append(output)
                 
             mid = torch.cat(output_chunks, dim=0).to(x.device)

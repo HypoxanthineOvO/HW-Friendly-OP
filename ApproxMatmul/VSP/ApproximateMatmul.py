@@ -135,19 +135,25 @@ def Approx_Matmul_Row(
     if debug:
         print("*" * 50)
     
-    for a_id in range(A_vec_size):
+    iterator = trange(A_vec_size) if debug else range(A_vec_size)
+    for a_id in iterator:
         if debug:
             printNamedTensor(f"A[{a_id}]", A[a_id])
         a_mat = A[a_id].repeat(B.size(0), 1)
-        product = B * a_mat
+        product = (B * a_mat).detach()
         
-        row_sorted_matrix = torch.sort(product, dim=1, descending=True)[0]
-        row_scores_max = row_sorted_matrix[:, :max_iter].sum(dim = 1)
-        row_scores_min = row_sorted_matrix[:, -max_iter: ].sum(dim = 1)
+        # row_sorted_matrix = torch.sort(product, dim=1, descending=True)[0]
+        # row_scores_max = row_sorted_matrix[:, :max_iter].sum(dim = 1)
+        # row_scores_min = row_sorted_matrix[:, -max_iter: ].sum(dim = 1)
+        
+        row_scores_max, _ = torch.topk(product, k=max_iter, dim=1)
+        row_scores_max = row_scores_max.sum(dim=1)
+        row_scores_min, _ = torch.topk(product, k=max_iter, dim=1, largest=False)
+        row_scores_min = row_scores_min.sum(dim=1)
         if debug:
             print(f"Max Iter: {max_iter}")
             printNamedTensor("Product ",product)
-            printNamedTensor("Row Sorted Matrix:", row_sorted_matrix)
+            
             printNamedTensor("Row Scores Max:", row_scores_max)
             printNamedTensor("Row Scores Min:", row_scores_min)
         row_scores = row_scores_max + row_scores_min
