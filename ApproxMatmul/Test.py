@@ -34,7 +34,18 @@ if __name__ == "__main__":
         Approx_Config = {
             "Method": "Row",
             "Max_Iter": 1.0,  # 1.0 means 50% of total multiplications
-            "Debug": True
+            "Debug": False  
+        }
+    )
+    
+    linear_Block = VSP.Linear(
+        in_features = IN_FEATURES, out_features = OUT_FEATURES,
+        bias = BIAS,
+        Approx_Config = {
+            "Method": "Block",
+            "Max_Iter": 1.0,  # 1.0 means 50% of total multiplications
+            "Block_Size": 2,  
+            "Debug": False
         }
     )
     
@@ -57,10 +68,18 @@ if __name__ == "__main__":
     linear_Row.load_torch_state_dict(linear_torch.state_dict())
     output_Row = linear_Row(x)
     VSP.printNamedTensor("Linear Output Torch:", output_torch.flatten()[:10])
-    VSP.printNamedTensor("Linear Output Mine:", output_Row.flatten()[:10])
+    VSP.printNamedTensor("Linear Output Mine(ROW):", output_Row.flatten()[:10])
     err = torch.nn.functional.mse_loss(output_torch, output_Row)
     print(f"Error: {err.item():.4f}")
     VSP.check(torch.allclose(output_torch, output_Row), "Output Check")
+    
+    linear_Block.load_torch_state_dict(linear_torch.state_dict())
+    output_Block = linear_Block(x)
+    VSP.printNamedTensor("Linear Output Torch:", output_torch.flatten()[:10])
+    VSP.printNamedTensor("Linear Output Mine(BLOCK):", output_Block.flatten()[:10])
+    err = torch.nn.functional.mse_loss(output_torch, output_Block)
+    print(f"Error: {err.item():.4f}")
+    VSP.check(torch.allclose(output_torch, output_Block), "Output Check")
     exit()
     
     
