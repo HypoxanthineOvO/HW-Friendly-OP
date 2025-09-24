@@ -214,8 +214,8 @@ def Approx_Matmul_Block(
             num_max_values = actual_block_size * max_iter
             num_min_values = actual_block_size * max_iter
             
-            if debug:
-                print(f"Block has {total_elements} elements, selecting {num_max_values} max and {num_min_values} min values")
+            #if debug:
+                #print(f"Block has {total_elements} elements, selecting {num_max_values} max and {num_min_values} min values")
             
             max_values, max_indices = torch.topk(block_flatten, k=num_max_values, largest=True)
 

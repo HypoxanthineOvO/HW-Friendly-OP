@@ -89,12 +89,12 @@ class Linear(torch.nn.Module):
             x_chunks = x.split(self.chunk_size, dim=0)
             output_chunks = []
             for chunk in x_chunks:
-                print(f"MEMORY Before Approx Matmul: {torch.cuda.memory_allocated() / (1024 ** 2) if torch.cuda.is_available() else 0:.2f} MB")
+                #print(f"MEMORY Before Approx Matmul: {torch.cuda.memory_allocated() / (1024 ** 2) if torch.cuda.is_available() else 0:.2f} MB")
                 chunk = chunk.to(self.weight.device)
                 output = Approx_Matmul(
                     chunk, self.weight, Approx_Config=self.Approx_Config
                 ).cpu()
-                print(f"MEMORY After Aprox Matmul: {torch.cuda.memory_allocated() / (1024 ** 2) if torch.cuda.is_available() else 0:.2f} MB")
+                #print(f"MEMORY After Aprox Matmul: {torch.cuda.memory_allocated() / (1024 ** 2) if torch.cuda.is_available() else 0:.2f} MB")
                 output_chunks.append(output)
                 
             mid = torch.cat(output_chunks, dim=0).to(x.device)
