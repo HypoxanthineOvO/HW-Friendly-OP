@@ -166,7 +166,7 @@ def Approx_Matmul_Row(
 
 """
 /**
- * @brief   将矩阵按块分组排序的近似矩阵乘法
+ * @brief   将矩阵按块分组排序的近似矩阵乘法 
  * @param   max_iter:每个行选择的最值数量,block_size:块的行数
  */
 """ 
@@ -177,75 +177,55 @@ def Approx_Matmul_Block(
     assert A.dim() == 2 and B.dim() == 2, "A and B must be 2D tensors"
     assert A.size(1) == B.size(1), f"A({A.shape}) and B({B.shape}) must have the same feature dimension"
     A_vec_size = A.size(0)
+    B_vec_size = B.size(0)
     dtype, device = A.dtype, A.device
     
-    total_score = []
-
     if debug:
         print("*" * 50)
         print(f"Block size: {block_size}, Max iter per row: {max_iter}")
     
-    # 算出总block数，向上取整
-    num_blocks = (B.size(0) + block_size - 1) // block_size
-
+    # 初始化总分数张量
+    total_score = torch.zeros((A_vec_size, B_vec_size), dtype=dtype, device=device)
+    
     for a_id in range(A_vec_size):
         if debug:
             printNamedTensor(f"A[{a_id}]", A[a_id])
-
-        a_mat = A[a_id].repeat(B.size(0), 1)
-        product = B * a_mat
         
-        row_scores = torch.zeros(B.size(0), dtype=dtype, device=device)
+        a_mat = A[a_id].repeat(B.size(0), 1).to(device)
+        product = (B * a_mat).detach() # Critical!!! If not detach, memory will keep increasing because of autograd
+            
+        # 按块处理B的行
+        num_blocks = (B_vec_size + block_size - 1) // block_size
         
         for block_id in range(num_blocks):
             start_row = block_id * block_size
-            # 用于防止最后一个block大小不匹配
-            end_row = min((block_id + 1) * block_size, B.size(0))
+            end_row = min(start_row + block_size, B_vec_size)
             actual_block_size = end_row - start_row
             
-            block = product[start_row : end_row, :]  
+            # 提取当前块：[actual_block_size, feature_dim]
+            block_product = product[start_row:end_row, :]
             
-            if debug:
-                print(f"\nBlock {block_id}: processing rows {start_row} to {end_row-1}")
-                printNamedTensor(f"Block {block_id} data", block)
+            if debug and block_id < 2:
+                print(f"Block {block_id}: rows {start_row} to {end_row-1}")
+                print(f"Block product shape: {block_product.shape}")
             
-            block_flatten = block.flatten()  
+            # 将块展平：[actual_block_size, feature_dim] -> [actual_block_size * feature_dim]
+            block_flat = block_product.flatten()
             
-            num_max_values = actual_block_size * max_iter
-            num_min_values = actual_block_size * max_iter
+            num_select = min(actual_block_size * max_iter, block_flat.numel())
             
-            #if debug:
-                #print(f"Block has {total_elements} elements, selecting {num_max_values} max and {num_min_values} min values")
+            # 找到最大值和最小值
+            max_values, max_indices = torch.topk(block_flat, k=num_select, largest=True)
+            min_values, min_indices = torch.topk(block_flat, k=num_select, largest=False)
             
-            max_values, max_indices = torch.topk(block_flatten, k=num_max_values, largest=True)
-
-            min_values, min_indices = torch.topk(block_flatten, k=num_min_values, largest=False)
+            max_row_indices = max_indices // product.size(1)  # feature_dim
+            min_row_indices = min_indices // product.size(1)
             
-            if debug:
-                print(f"Selected max values: {max_values[:5] if len(max_values) > 0 else 'None'}...")
-                print(f"Selected min values: {min_values[:5] if len(min_values) > 0 else 'None'}...")
-
-            feature_dim = block.size(1)
-            for idx, value in zip(max_indices, max_values):
-                # 在block里的索引0,1,2
-                row_in_block = idx.item() // feature_dim
-                # 在整个矩阵中的索引  
-                global_row = start_row + row_in_block     
-                row_scores[global_row] += value.item()     
+            max_global_rows = max_row_indices + start_row
+            min_global_rows = min_row_indices + start_row
             
-            for idx, value in zip(min_indices, min_values):
-                row_in_block = idx.item() // feature_dim
-                global_row = start_row + row_in_block
-                row_scores[global_row] += value.item()
-            
-            if debug:
-                print(f"Row scores after processing block {block_id}:")
-                for i in range(start_row, end_row):
-                    print(f"  Row {i}: {row_scores[i].item():.4f}")
-        
-        total_score.append(row_scores)
-
-    total_score = torch.stack(total_score)
+            total_score[a_id].scatter_add_(0, max_global_rows, max_values)
+            total_score[a_id].scatter_add_(0, min_global_rows, min_values)
     
     if debug:
         printNamedTensor("Total Score:", total_score)
