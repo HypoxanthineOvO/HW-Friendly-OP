@@ -139,7 +139,7 @@ def Approx_Matmul_Row(
     if debug:
         print("*" * 50)
     
-    for a_id in range(A_vec_size):
+    for a_id in trange(A_vec_size):
         if debug:
             printNamedTensor(f"A[{a_id}]", A[a_id])
         a_mat = A[a_id].repeat(B.size(0), 1)
