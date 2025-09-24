@@ -17,8 +17,12 @@ def Approx_Matmul(
         max_iter = Approx_Config.get("Max_Iter", 10)
         return Approx_Matmul_A3(A, B, max_iter=max_iter, debug=debug)
     elif (method == "Row"):
-        max_iter = Approx_Config.get("Max_Iter", 1.0)
+        max_iter = Approx_Config.get("Max_Iter", 10)
         return Approx_Matmul_Row(A, B, max_iter = max_iter, debug = debug)
+    elif (method == "Block"):
+        max_iter = Approx_Config.get("Max_Iter", 10)
+        block_size = Approx_Config.get("Block_Size", 3)
+        return Approx_Matmul_Block(A, B, max_iter=max_iter, block_size=block_size, debug=debug)
     else:
         raise ValueError(f"Unknown Approximation Method: {method}")
 
@@ -131,7 +135,7 @@ def Approx_Matmul_Row(
     dtype, device = A.dtype, A.device
     
     total_score = []
-    
+
     if debug:
         print("*" * 50)
     
@@ -160,6 +164,74 @@ def Approx_Matmul_Row(
         total_score.append(row_scores)
 
     total_score = torch.stack(total_score)
+    
+    if debug:
+        printNamedTensor("Total Score:", total_score)
+        print("*" * 50)
+    return total_score
+
+"""
+/**
+ * @brief   将矩阵按块分组排序的近似矩阵乘法 
+ * @param   max_iter:每个行选择的最值数量,block_size:块的行数
+ */
+""" 
+def Approx_Matmul_Block(
+    A: torch.Tensor, B: torch.Tensor,
+    max_iter: int = 10, block_size: int = 3, debug: bool = False
+) -> torch.Tensor:
+    assert A.dim() == 2 and B.dim() == 2, "A and B must be 2D tensors"
+    assert A.size(1) == B.size(1), f"A({A.shape}) and B({B.shape}) must have the same feature dimension"
+    A_vec_size = A.size(0)
+    B_vec_size = B.size(0)
+    dtype, device = A.dtype, A.device
+    
+    if debug:
+        print("*" * 50)
+        print(f"Block size: {block_size}, Max iter per row: {max_iter}")
+    
+    # 初始化总分数张量
+    total_score = torch.zeros((A_vec_size, B_vec_size), dtype=dtype, device=device)
+    
+    for a_id in range(A_vec_size):
+        if debug:
+            printNamedTensor(f"A[{a_id}]", A[a_id])
+        
+        a_mat = A[a_id].repeat(B.size(0), 1).to(device)
+        product = (B * a_mat).detach() # Critical!!! If not detach, memory will keep increasing because of autograd
+            
+        # 按块处理B的行
+        num_blocks = (B_vec_size + block_size - 1) // block_size
+        
+        for block_id in range(num_blocks):
+            start_row = block_id * block_size
+            end_row = min(start_row + block_size, B_vec_size)
+            actual_block_size = end_row - start_row
+            
+            # 提取当前块：[actual_block_size, feature_dim]
+            block_product = product[start_row:end_row, :]
+            
+            if debug and block_id < 2:
+                print(f"Block {block_id}: rows {start_row} to {end_row-1}")
+                print(f"Block product shape: {block_product.shape}")
+            
+            # 将块展平：[actual_block_size, feature_dim] -> [actual_block_size * feature_dim]
+            block_flat = block_product.flatten()
+            
+            num_select = min(actual_block_size * max_iter, block_flat.numel())
+            
+            # 找到最大值和最小值
+            max_values, max_indices = torch.topk(block_flat, k=num_select, largest=True)
+            min_values, min_indices = torch.topk(block_flat, k=num_select, largest=False)
+            
+            max_row_indices = max_indices // product.size(1)  # feature_dim
+            min_row_indices = min_indices // product.size(1)
+            
+            max_global_rows = max_row_indices + start_row
+            min_global_rows = min_row_indices + start_row
+            
+            total_score[a_id].scatter_add_(0, max_global_rows, max_values)
+            total_score[a_id].scatter_add_(0, min_global_rows, min_values)
     
     if debug:
         printNamedTensor("Total Score:", total_score)
